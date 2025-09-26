@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Wolf Clips — Dual View</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body { height: 100%; margin: 0; background: #0f1115; }
+    .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; height: 100vh; padding: 8px; box-sizing: border-box; }
+    .pane { position: relative; background: #1a1d24; border-radius: 10px; overflow: hidden; }
+    iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="pane"><iframe id="left" allowfullscreen allow="autoplay; picture-in-picture"></iframe></div>
+    <div class="pane"><iframe id="right" allowfullscreen allow="autoplay; picture-in-picture"></iframe></div>
+  </div>
+
+  <script>
+    // ?left=<videoId or twitch url>&t1=<time like 1h2m3s or 360s>&right=<videoId or url>&t2=<...>
+    function q(k){ const u=new URL(location.href); return u.searchParams.get(k)||""; }
+    function normT(t){
+      if(!t) return "";
+      if(/[hms]/i.test(t)) return t;
+      if(/^\d+$/.test(t)) return t + "s";
+      return t;
+    }
+    function extractVideoId(input){
+      if(!input) return "";
+      const s = String(input);
+      const m = s.match(/videos\/(\d+)/i) || s.match(/[?&]v=(\d+)/i) || s.match(/v(\d+)/i);
+      return m ? m[1] : s; // allow raw IDs too
+    }
+    function buildSrc(videoId, time){
+      const parent = location.hostname; // required by Twitch
+      const u = new URL("https://player.twitch.tv/");
+      u.searchParams.set("video", "v" + videoId.replace(/^v/i,""));
+      if (time) u.searchParams.set("time", normT(time)); // Twitch embed uses 'time'
+      u.searchParams.set("autoplay", "true");
+      u.searchParams.set("parent", parent);
+      return u.toString();
+    }
+
+    const leftId  = extractVideoId(q("left"));
+    const rightId = extractVideoId(q("right"));
+    const t1 = q("t1") || q("t") || "";
+    const t2 = q("t2") || "";
+
+    if (leftId)  document.getElementById("left").src  = buildSrc(leftId,  t1);
+    if (rightId) document.getElementById("right").src = buildSrc(rightId, t2);
+  </script>
+</body>
+</html>
