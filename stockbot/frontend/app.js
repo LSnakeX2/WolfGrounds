@@ -104,9 +104,11 @@ document.getElementById("quote-form").addEventListener("submit", (e) => {
   if (v) lookupQuotes(v);
 });
 
-// ── paper trading ───────────────────────────────────────────────────────────
-let paperEnabled = false;
+// ── trading ───────────────────────────────────────────────────────────────
+let tradingMode = "read_only";
 let currentSide = "buy";
+let pendingOrder = null; // live order awaiting confirmation
+let killed = false;
 
 async function loadPaper() {
   let p;
@@ -161,6 +163,42 @@ async function loadPaper() {
     : `<tr><td colspan="6" class="muted">No trades yet.</td></tr>`;
 }
 
+function submitLabel() {
+  const verb = currentSide === "buy" ? "Buy" : "Sell";
+  return tradingMode === "live" ? `Review ${verb} order` : `${verb} (paper)`;
+}
+
+async function postOrder(body) {
+  const r = await fetch("/api/order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+function showConfirm(preview, body) {
+  pendingOrder = { ...body, confirm: true };
+  const rows = [
+    ["Action", `${preview.side.toUpperCase()} ${preview.symbol}`],
+    ["Quantity", preview.quantity],
+    ["Order type", preview.type === "limit" ? `Limit @ ${fmtUSD(preview.limit_price)}` : "Market"],
+    ["Last price", fmtUSD(preview.last_price)],
+    ["Est. cost", fmtUSD(preview.est_notional)],
+  ];
+  document.getElementById("confirm-details").innerHTML = rows
+    .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+    .join("");
+  document.getElementById("confirm-modal").hidden = false;
+}
+
+function hideConfirm() {
+  document.getElementById("confirm-modal").hidden = true;
+  pendingOrder = null;
+}
+
 function setupTradePanel() {
   // Buy/Sell segmented control
   document.querySelectorAll("#side-seg button").forEach((b) => {
@@ -168,17 +206,17 @@ function setupTradePanel() {
       currentSide = b.dataset.side;
       document.querySelectorAll("#side-seg button").forEach((x) => x.classList.remove("active"));
       b.classList.add("active");
-      document.getElementById("t-submit").textContent =
-        (currentSide === "buy" ? "Buy" : "Sell") + " (paper)";
+      document.getElementById("t-submit").textContent = submitLabel();
     });
   });
+  document.getElementById("t-submit").textContent = submitLabel();
 
   // Show limit price field only for limit orders
   document.getElementById("t-type").addEventListener("change", (e) => {
     document.getElementById("t-limit").hidden = e.target.value !== "limit";
   });
 
-  // Submit order
+  // Submit
   document.getElementById("trade-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = document.getElementById("trade-msg");
@@ -195,18 +233,17 @@ function setupTradePanel() {
     const body = { symbol, side: currentSide, quantity, type };
     if (type === "limit") body.limit_price = limit_price;
 
-    const btn = document.getElementById("t-submit");
-    btn.disabled = true;
-    msg.textContent = "Placing…";
+    msg.textContent = tradingMode === "live" ? "Getting preview…" : "Placing…";
     msg.className = "trade-msg";
     try {
-      const r = await fetch("/api/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || r.statusText);
+      const data = await postOrder(body); // no confirm flag
+      if (tradingMode === "live" && data.preview && !data.ok) {
+        // Live: surface the confirmation modal instead of filling.
+        showConfirm(data.preview, body);
+        msg.textContent = "";
+        return;
+      }
+      // Paper: filled immediately.
       const t = data.trade;
       msg.textContent = `✓ ${t.side.toUpperCase()} ${t.quantity} ${t.symbol} @ ${fmtUSD(t.price)} (paper)`;
       msg.className = "trade-msg ok";
@@ -215,19 +252,74 @@ function setupTradePanel() {
     } catch (err) {
       msg.textContent = "✗ " + err.message;
       msg.className = "trade-msg err";
-    } finally {
-      btn.disabled = false;
     }
   });
 
-  // Reset
-  document.getElementById("p-reset").addEventListener("click", async () => {
-    if (!confirm("Reset paper account to its starting cash? This clears all paper positions and trades.")) return;
-    await fetch("/api/paper/reset", { method: "POST" });
-    loadPaper();
+  // Confirm modal (live)
+  document.getElementById("confirm-cancel").addEventListener("click", hideConfirm);
+  document.getElementById("confirm-place").addEventListener("click", async () => {
+    if (!pendingOrder) return;
     const msg = document.getElementById("trade-msg");
-    msg.textContent = "Paper account reset.";
-    msg.className = "trade-msg ok";
+    const btn = document.getElementById("confirm-place");
+    btn.disabled = true;
+    btn.textContent = "Placing…";
+    try {
+      const data = await postOrder(pendingOrder);
+      const o = data.order;
+      msg.textContent = `✓ LIVE ${o.side.toUpperCase()} ${o.quantity} ${pendingOrder.symbol} submitted (state: ${o.state || "pending"}).`;
+      msg.className = "trade-msg ok";
+      document.getElementById("t-qty").value = "";
+      loadPortfolio();
+    } catch (err) {
+      msg.textContent = "✗ " + err.message;
+      msg.className = "trade-msg err";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Place real order";
+      hideConfirm();
+    }
+  });
+
+  // Paper reset (only present in paper mode)
+  const resetBtn = document.getElementById("p-reset");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", async () => {
+      if (!confirm("Reset paper account to its starting cash? This clears all paper positions and trades.")) return;
+      await fetch("/api/paper/reset", { method: "POST" });
+      loadPaper();
+      const msg = document.getElementById("trade-msg");
+      msg.textContent = "Paper account reset.";
+      msg.className = "trade-msg ok";
+    });
+  }
+}
+
+function setupKillSwitch(status) {
+  const banner = document.getElementById("live-banner");
+  const cap = document.getElementById("lb-cap");
+  let capText = fmtUSD(status.max_order_usd);
+  if (status.max_order_shares) capText += ` / ${status.max_order_shares} shares`;
+  cap.textContent = capText;
+
+  const applyKill = (k) => {
+    killed = k;
+    const btn = document.getElementById("kill-btn");
+    const submit = document.getElementById("t-submit");
+    banner.classList.toggle("killed", k);
+    btn.classList.toggle("engaged", k);
+    btn.textContent = k ? "Disengage kill switch" : "Engage kill switch";
+    if (submit) submit.disabled = k;
+  };
+  applyKill(status.killed);
+
+  document.getElementById("kill-btn").addEventListener("click", async () => {
+    const r = await fetch("/api/kill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: !killed }),
+    });
+    const data = await r.json();
+    applyKill(data.killed);
   });
 }
 
@@ -235,21 +327,29 @@ function setupTradePanel() {
   const s = await loadStatus();
   if (!s || !s.logged_in) return;
 
-  paperEnabled = s.trading_mode === "paper";
-  document.getElementById("paper-panel").hidden = !paperEnabled;
-  document.getElementById("paper-disabled").hidden = paperEnabled;
+  tradingMode = s.trading_mode;
+  const isPaper = tradingMode === "paper";
+  const isLive = tradingMode === "live";
+  const tradingOn = isPaper || isLive;
+
+  document.getElementById("trade-panel").hidden = !tradingOn;
+  document.getElementById("paper-portfolio").hidden = !isPaper;
+  document.getElementById("live-banner").hidden = !isLive;
+  document.getElementById("trading-disabled").hidden = tradingOn;
+  document.getElementById("trade-title").textContent = isLive
+    ? "⚠️ Live Trade — real money"
+    : "📝 Paper Trade — simulated";
 
   loadPortfolio();
-  if (paperEnabled) {
-    setupTradePanel();
-    loadPaper();
-  }
+  if (tradingOn) setupTradePanel();
+  if (isPaper) loadPaper();
+  if (isLive) setupKillSwitch(s);
 
   setInterval(async () => {
     const st = await loadStatus();
     if (st && st.logged_in) {
       loadPortfolio();
-      if (paperEnabled) loadPaper();
+      if (isPaper) loadPaper();
     }
   }, REFRESH_MS);
 })();

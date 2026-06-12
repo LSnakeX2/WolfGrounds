@@ -97,6 +97,39 @@ class RobinhoodClient:
         """Map of {symbol: last_trade_price} for quick valuation lookups."""
         return {q["symbol"]: q["price"] for q in self.get_quotes(symbols)}
 
+    # ── LIVE TRADING (Step 3) ────────────────────────────────────────────────
+    # These place REAL orders with REAL money. The app layer gates them behind
+    # TRADING_MODE=live, a kill switch, a max-order cap, and a confirm step.
+    def place_live_order(self, symbol, side, quantity, order_type, limit_price=None):
+        symbol = symbol.strip().upper()
+        side = side.lower()
+        quantity = float(quantity)
+
+        if order_type == "limit":
+            if not limit_price or float(limit_price) <= 0:
+                raise ValueError("Limit price required for a limit order.")
+            fn = rh.orders.order_buy_limit if side == "buy" else rh.orders.order_sell_limit
+            result = fn(symbol, quantity, float(limit_price))
+        else:
+            fn = rh.orders.order_buy_market if side == "buy" else rh.orders.order_sell_market
+            result = fn(symbol, quantity)
+
+        # robin_stocks returns the order dict on success, or an error payload.
+        if not result:
+            raise RuntimeError("Order failed: no response from Robinhood.")
+        if result.get("detail"):
+            raise RuntimeError(result["detail"])
+        if result.get("non_field_errors"):
+            raise RuntimeError("; ".join(result["non_field_errors"]))
+        return {
+            "id": result.get("id"),
+            "state": result.get("state"),
+            "side": result.get("side", side),
+            "quantity": result.get("quantity", quantity),
+            "price": result.get("price"),
+            "type": result.get("type", order_type),
+        }
+
     def get_quotes(self, symbols):
         """Live quote lookup for one or more ticker symbols."""
         symbols = [s.strip().upper() for s in symbols if s.strip()]

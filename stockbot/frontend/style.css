@@ -87,6 +87,33 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .link-btn { background: none; color: var(--muted); padding: 0 0 0 10px; font-size: 11px; font-weight: 500; text-decoration: underline; cursor: pointer; }
 
+/* live banner + kill switch */
+.live-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: linear-gradient(90deg, #3a0d0d, #2a0808);
+  border: 1px solid var(--red); border-radius: 12px;
+  padding: 14px 18px; margin-bottom: 20px; font-size: 14px;
+}
+.live-banner strong { color: var(--red); }
+.live-banner.killed { background: #14181f; border-color: #313742; }
+.live-banner.killed strong { color: var(--muted); }
+.kill-btn { background: var(--red); color: #fff; white-space: nowrap; }
+.kill-btn.engaged { background: var(--green); color: #06210f; }
+
+/* confirmation modal */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-box { background: var(--panel); border: 1px solid var(--red); border-radius: 14px; padding: 24px; width: min(420px, 92vw); }
+.modal-box h3 { margin: 0 0 4px; font-size: 18px; }
+.live-tag { background: var(--red); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+.modal-warn { color: var(--red); font-size: 13px; margin: 4px 0 16px; }
+.confirm-table { width: 100%; margin-bottom: 18px; }
+.confirm-table td { padding: 6px 0; border-bottom: 1px solid #262b35; font-size: 14px; }
+.confirm-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.confirm-table td:first-child { color: var(--muted); }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.modal-actions button { padding: 10px 18px; }
+button.ghost { background: var(--panel-2); color: var(--text); }
+
 .footnote { color: var(--muted); font-size: 12px; margin-top: 28px; }
 code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; }
 

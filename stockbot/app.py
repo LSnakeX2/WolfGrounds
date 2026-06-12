@@ -34,6 +34,16 @@ paper = PaperBroker(
     starting_cash=float(os.getenv("PAPER_STARTING_CASH", "10000")),
 )
 
+# ── Live-trading guardrails (Step 3) ─────────────────────────────────────────
+# Hard cap on the dollar value of any single order. A live order above this is
+# rejected by the server, no matter what the UI sends.
+MAX_ORDER_USD = float(os.getenv("MAX_ORDER_USD", "500"))
+# Optional cap on share count per order (0 = no share cap).
+MAX_ORDER_SHARES = float(os.getenv("MAX_ORDER_SHARES", "0"))
+# Kill switch: when engaged, all live orders are refused. Starts engaged if
+# TRADING_KILLED=true in .env; can be toggled at runtime via /api/kill.
+trading_killed = os.getenv("TRADING_KILLED", "false").lower() in ("1", "true", "yes")
+
 
 def init_client():
     """Log in once at startup using credentials from .env."""
@@ -82,8 +92,20 @@ def api_status():
             "logged_in": bool(client and client.logged_in),
             "trading_mode": TRADING_MODE,
             "error": login_error,
+            "killed": trading_killed,
+            "max_order_usd": MAX_ORDER_USD,
+            "max_order_shares": MAX_ORDER_SHARES,
         }
     )
+
+
+@app.route("/api/kill", methods=["POST"])
+def api_kill():
+    """Engage/disengage the live-trading kill switch."""
+    global trading_killed
+    data = request.get_json(silent=True) or {}
+    trading_killed = bool(data.get("enabled", True))
+    return jsonify({"killed": trading_killed})
 
 
 @app.route("/api/portfolio")
@@ -131,18 +153,16 @@ def api_paper_reset():
 
 @app.route("/api/order", methods=["POST"])
 def api_order():
-    """Place an order.
+    """Place an order, routed by TRADING_MODE.
 
-    Routed by TRADING_MODE:
       read_only -> 403 (no trading)
       paper     -> simulated fill against the live market price
-      live      -> 403 for now (real orders arrive in Step 3, with guardrails)
+      live      -> REAL order. Requires confirm=true; without it, returns a
+                   preview. Gated by the kill switch and the max-order cap.
     """
     if TRADING_MODE == "read_only":
         return jsonify({"error": "Trading is disabled (TRADING_MODE=read_only)."}), 403
-    if TRADING_MODE == "live":
-        return jsonify({"error": "Live trading not yet implemented (Step 3)."}), 403
-    if TRADING_MODE != "paper":
+    if TRADING_MODE not in ("paper", "live"):
         return jsonify({"error": f"Unknown TRADING_MODE '{TRADING_MODE}'."}), 400
 
     guard = require_client()
@@ -161,13 +181,7 @@ def api_order():
     if not symbol or side not in ("buy", "sell") or quantity <= 0:
         return jsonify({"error": "symbol, side (buy/sell), and quantity are required."}), 400
 
-    # Derive the fill price from a live quote.
-    quotes = client.get_quotes([symbol])
-    if not quotes:
-        return jsonify({"error": f"No market data for {symbol}."}), 400
-    q = quotes[0]
-    last = q["price"]
-
+    limit_price = None
     if order_type == "limit":
         try:
             limit_price = float(data.get("limit_price") or 0)
@@ -175,7 +189,65 @@ def api_order():
             return jsonify({"error": "Invalid limit price."}), 400
         if limit_price <= 0:
             return jsonify({"error": "Limit price required for limit orders."}), 400
-        # Immediate-or-reject: fill only if the limit is marketable right now.
+
+    # Live market data for pricing/preview.
+    quotes = client.get_quotes([symbol])
+    if not quotes:
+        return jsonify({"error": f"No market data for {symbol}."}), 400
+    last = quotes[0]["price"]
+    est_price = limit_price if order_type == "limit" else last
+    est_notional = quantity * est_price
+
+    if TRADING_MODE == "paper":
+        return _place_paper(symbol, side, quantity, order_type, limit_price, last)
+
+    # ── LIVE ────────────────────────────────────────────────────────────────
+    if trading_killed:
+        return jsonify({"error": "Kill switch engaged — live trading is disabled."}), 423
+
+    # Hard caps enforced server-side regardless of the UI.
+    if est_notional > MAX_ORDER_USD:
+        return (
+            jsonify(
+                {
+                    "error": f"Order ${est_notional:,.2f} exceeds the max-order cap "
+                    f"of ${MAX_ORDER_USD:,.2f}. Raise MAX_ORDER_USD in .env to allow it."
+                }
+            ),
+            422,
+        )
+    if MAX_ORDER_SHARES and quantity > MAX_ORDER_SHARES:
+        return (
+            jsonify({"error": f"Quantity {quantity} exceeds the {MAX_ORDER_SHARES}-share cap."}),
+            422,
+        )
+
+    preview = {
+        "symbol": symbol,
+        "side": side,
+        "quantity": quantity,
+        "type": order_type,
+        "limit_price": limit_price,
+        "last_price": last,
+        "est_price": est_price,
+        "est_notional": round(est_notional, 2),
+    }
+
+    # Two-step: no confirm flag => return the preview, place nothing.
+    if not data.get("confirm"):
+        return jsonify({"preview": preview})
+
+    try:
+        order = client.place_live_order(symbol, side, quantity, order_type, limit_price)
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": f"Order rejected: {e}"}), 422
+
+    return jsonify({"ok": True, "live": True, "order": order, "preview": preview})
+
+
+def _place_paper(symbol, side, quantity, order_type, limit_price, last):
+    """Simulated fill against the live price (paper mode)."""
+    if order_type == "limit":
         marketable = last <= limit_price if side == "buy" else last >= limit_price
         if not marketable:
             return (
@@ -189,7 +261,6 @@ def api_order():
             )
         fill_price = limit_price
     else:
-        order_type = "market"
         fill_price = last
 
     try:
