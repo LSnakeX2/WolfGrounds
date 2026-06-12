@@ -1,0 +1,35 @@
+# ──────────────────────────────────────────────────────────────
+# SECURITY: never commit credentials or session tokens.
+# A leaked .env or robin_stocks token = full access to your money.
+# ──────────────────────────────────────────────────────────────
+.env
+*.env
+!.env.example
+
+# robin_stocks caches a login/session token here by default.
+.tokens/
+*.pickle
+robinhood.pickle
+
+# Paper-trading account state (local sandbox data).
+paper_account.json
+paper_account.json.tmp
+
+# Saved automated strategies (local user config).
+strategies.json
+strategies.json.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.Python
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/

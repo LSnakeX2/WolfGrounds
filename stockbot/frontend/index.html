@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Wolf Grounds Alpha</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🐺 Wolf Grounds <span class="muted">Alpha</span></h1>
+    <div id="status" class="status">connecting…</div>
+  </header>
+
+  <main>
+    <!-- Account summary -->
+    <section class="cards" id="summary">
+      <div class="card"><div class="label">Total Value</div><div class="value" id="total-equity">—</div></div>
+      <div class="card"><div class="label">Day Change</div><div class="value" id="day-change">—</div></div>
+      <div class="card"><div class="label">Buying Power (Cash)</div><div class="value" id="cash">—</div></div>
+    </section>
+
+    <!-- Quote lookup -->
+    <section class="panel">
+      <h2>Quote lookup</h2>
+      <form id="quote-form">
+        <input id="quote-input" type="text" placeholder="AAPL, MSFT, TSLA" autocomplete="off" />
+        <button type="submit">Get quotes</button>
+      </form>
+      <div id="quote-results"></div>
+    </section>
+
+    <!-- LIVE mode banner + kill switch (TRADING_MODE=live) -->
+    <section id="live-banner" class="live-banner" hidden>
+      <div>
+        <strong>● LIVE TRADING</strong> — orders place <strong>real</strong> trades with
+        <strong>real money</strong>. Max order: <span id="lb-cap">—</span>.
+      </div>
+      <button type="button" id="kill-btn" class="kill-btn">Engage kill switch</button>
+    </section>
+
+    <!-- Trade panel (paper or live) -->
+    <section class="panel" id="trade-panel" hidden>
+      <h2 id="trade-title">Trade</h2>
+      <form id="trade-form" class="trade-form">
+        <div class="seg" id="side-seg">
+          <button type="button" data-side="buy" class="active">Buy</button>
+          <button type="button" data-side="sell">Sell</button>
+        </div>
+        <input id="t-symbol" type="text" placeholder="Symbol" autocomplete="off" />
+        <input id="t-qty" type="number" step="any" min="0" placeholder="Qty" />
+        <select id="t-type">
+          <option value="market">Market</option>
+          <option value="limit">Limit</option>
+        </select>
+        <input id="t-limit" type="number" step="any" min="0" placeholder="Limit $" hidden />
+        <button type="submit" id="t-submit">Place order</button>
+      </form>
+      <div id="trade-msg" class="trade-msg"></div>
+    </section>
+
+    <!-- Paper portfolio (paper mode only) -->
+    <section class="panel" id="paper-portfolio" hidden>
+      <h2>📝 Paper Account <span class="muted">· simulated, no real money</span></h2>
+      <div class="cards paper-summary">
+        <div class="card sm"><div class="label">Paper Equity</div><div class="value" id="p-equity">—</div></div>
+        <div class="card sm"><div class="label">Total P&amp;L</div><div class="value" id="p-pnl">—</div></div>
+        <div class="card sm"><div class="label">Paper Cash</div><div class="value" id="p-cash">—</div></div>
+        <div class="card sm"><div class="label">Realized P&amp;L</div><div class="value" id="p-realized">—</div></div>
+      </div>
+
+      <h3 class="subhead">Paper positions</h3>
+      <table id="p-positions">
+        <thead><tr>
+          <th>Symbol</th><th>Qty</th><th class="num">Avg cost</th>
+          <th class="num">Price</th><th class="num">Mkt value</th><th class="num">Unreal. P&amp;L</th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="muted">No paper positions.</td></tr></tbody>
+      </table>
+
+      <h3 class="subhead">Recent paper trades
+        <button type="button" id="p-reset" class="link-btn">reset account</button>
+      </h3>
+      <table id="p-trades">
+        <thead><tr>
+          <th>Time</th><th>Side</th><th>Symbol</th>
+          <th class="num">Qty</th><th class="num">Price</th><th class="num">Notional</th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="muted">No trades yet.</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- notice when trading is disabled -->
+    <section class="panel" id="trading-disabled" hidden>
+      <h2>Trading</h2>
+      <p class="muted">This build is read-only. Set <code>TRADING_MODE=paper</code>
+      (simulated) or <code>TRADING_MODE=live</code> (real money) in your
+      <code>.env</code> and restart to enable trading.</p>
+    </section>
+
+    <!-- Live order confirmation modal -->
+    <div id="confirm-modal" class="modal" hidden>
+      <div class="modal-box">
+        <h3>Confirm <span class="live-tag">LIVE</span> order</h3>
+        <p class="modal-warn">This places a real order with real money.</p>
+        <table class="confirm-table"><tbody id="confirm-details"></tbody></table>
+        <div class="modal-actions">
+          <button type="button" id="confirm-cancel" class="ghost">Cancel</button>
+          <button type="button" id="confirm-place">Place real order</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Open orders + history (live mode) -->
+    <section class="panel" id="orders-panel" hidden>
+      <h2>Live Orders <button type="button" id="orders-refresh" class="link-btn">refresh</button></h2>
+      <table id="orders-table">
+        <thead><tr>
+          <th>Created</th><th>Symbol</th><th>Side</th><th>Type</th>
+          <th class="num">Qty</th><th class="num">Filled</th><th>State</th><th></th>
+        </tr></thead>
+        <tbody><tr><td colspan="8" class="muted">loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- Automated strategies (paper or live) -->
+    <section class="panel" id="strategies-panel" hidden>
+      <h2>🤖 Automated Strategies <span class="muted" id="strat-mode"></span></h2>
+      <p class="muted strat-note">New strategies start <strong>disabled</strong>. While enabled they
+      trade on their own — every order still obeys the max-order cap and kill switch.</p>
+
+      <form id="strat-form" class="strat-form">
+        <select id="s-type">
+          <option value="dca">DCA / recurring</option>
+          <option value="rebalance">Rebalance</option>
+        </select>
+
+        <!-- DCA fields -->
+        <span class="s-fields" data-for="dca">
+          <select id="s-side"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+          <input id="s-symbol" type="text" placeholder="Symbol" />
+          <input id="s-amount" type="number" step="any" min="0" placeholder="$ amount" />
+          <span class="muted">or</span>
+          <input id="s-shares" type="number" step="any" min="0" placeholder="shares" />
+        </span>
+
+        <!-- Rebalance fields -->
+        <span class="s-fields" data-for="rebalance" hidden>
+          <input id="s-targets" type="text" placeholder="AAPL:0.5, MSFT:0.5" class="wide" />
+          <input id="s-threshold" type="number" step="any" min="0" placeholder="min $ trade" />
+        </span>
+
+        <select id="s-interval">
+          <option value="3600">hourly</option>
+          <option value="86400" selected>daily</option>
+          <option value="604800">weekly</option>
+        </select>
+        <button type="submit">Add strategy</button>
+      </form>
+      <div id="strat-msg" class="trade-msg"></div>
+
+      <table id="strat-table">
+        <thead><tr>
+          <th>Type</th><th>Details</th><th>Every</th><th>Last run</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="muted">No strategies yet.</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- Holdings -->
+    <section class="panel">
+      <h2>Real Holdings <span class="muted" id="refresh-note"></span></h2>
+      <table id="holdings">
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Qty</th><th class="num">Price</th>
+            <th class="num">Avg cost</th><th class="num">Mkt value</th>
+            <th class="num">Day</th><th class="num">Total %</th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="7" class="muted">loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <p class="footnote">
+      Read-only build · no trades are placed · runs on localhost only.
+      Unofficial Robinhood access via <code>robin_stocks</code>.
+    </p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
