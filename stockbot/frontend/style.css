@@ -66,6 +66,27 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .quote-row .sym { font-weight: 600; font-size: 15px; }
 .quote-row .px { font-variant-numeric: tabular-nums; }
 
+/* paper trading */
+.card.sm .value { font-size: 20px; }
+.paper-summary { grid-template-columns: repeat(4, 1fr); margin-bottom: 18px; }
+.subhead { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 22px 0 8px; }
+
+.trade-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.trade-form input, .trade-form select { background: var(--panel-2); border: 1px solid #313742; color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.trade-form #t-symbol { width: 110px; text-transform: uppercase; }
+.trade-form #t-qty, .trade-form #t-limit { width: 90px; }
+
+.seg { display: inline-flex; background: var(--panel-2); border-radius: 8px; padding: 3px; }
+.seg button { background: transparent; color: var(--muted); padding: 7px 16px; font-weight: 600; }
+.seg button.active[data-side=buy] { background: var(--green); color: #06210f; }
+.seg button.active[data-side=sell] { background: var(--red); color: #2a0606; }
+
+.trade-msg { margin-top: 12px; font-size: 14px; min-height: 1em; }
+.trade-msg.ok { color: var(--green); }
+.trade-msg.err { color: var(--red); }
+
+.link-btn { background: none; color: var(--muted); padding: 0 0 0 10px; font-size: 11px; font-weight: 500; text-decoration: underline; cursor: pointer; }
+
 .footnote { color: var(--muted); font-size: 12px; margin-top: 28px; }
 code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; }
 

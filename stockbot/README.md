@@ -2,9 +2,11 @@
 
 A local web dashboard for your Robinhood account, part of the Wolf Grounds family.
 
-**Current build: STEP 1 — read-only.** It shows your real portfolio, live
-quotes, and day P&L. It does **not** place any trades. Trading arrives in a
-later step, behind explicit confirmation, a max-order cap, and a kill switch.
+**Current build: STEP 2 — read-only dashboard + paper trading.** It shows your
+real portfolio, live quotes, and day P&L, and includes a simulated trade panel
+that fills against **live** market prices with no real money. Live trading
+arrives in Step 3, behind explicit confirmation, a max-order cap, and a kill
+switch.
 
 Powered by the unofficial [`robin_stocks`](https://github.com/jmfernandes/robin_stocks)
 library.
@@ -61,12 +63,22 @@ stockbot/
 | Endpoint         | Returns                                   |
 |------------------|-------------------------------------------|
 | `GET /api/status`    | login state + trading mode            |
-| `GET /api/portfolio` | account summary + holdings            |
+| `GET /api/portfolio` | real account summary + holdings       |
 | `GET /api/quote?symbols=AAPL,MSFT` | live quotes             |
-| `POST /api/order`    | disabled (403) until the trading step |
+| `GET /api/paper`     | paper account state (paper mode)      |
+| `POST /api/paper/reset` | reset the paper account            |
+| `POST /api/order`    | place an order — paper fill in paper mode; 403 in read_only / live |
+
+### Paper trading
+
+Set `TRADING_MODE=paper` in `.env` (and optionally `PAPER_STARTING_CASH`) and
+restart. The dashboard shows a Buy/Sell panel and a paper portfolio. Orders
+fill at the live market price (market orders) or at your limit if it's
+marketable right now (resting limit orders come later). Paper state persists to
+`paper_account.json` (gitignored); "reset account" wipes it.
 
 ## Roadmap
 
-1. **Read-only dashboard** ← you are here
-2. **Paper trading** — simulated fills against live prices, same UI
+1. **Read-only dashboard** ✅
+2. **Paper trading** — simulated fills against live prices, same UI ✅ ← you are here
 3. **Live trading** — real orders, behind confirmation + max-order cap + kill switch

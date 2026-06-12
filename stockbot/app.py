@@ -14,6 +14,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from dotenv import load_dotenv
 
 from robinhood_client import RobinhoodClient
+from paper_engine import PaperBroker, PaperError
 
 load_dotenv()
 
@@ -26,6 +27,12 @@ app = Flask(__name__, static_folder=None)
 client = None
 login_error = None
 TRADING_MODE = os.getenv("TRADING_MODE", "read_only").lower()
+
+# Paper-trading sandbox (Step 2). Active whenever TRADING_MODE == "paper".
+paper = PaperBroker(
+    state_path=os.path.join(HERE, "paper_account.json"),
+    starting_cash=float(os.getenv("PAPER_STARTING_CASH", "10000")),
+)
 
 
 def init_client():
@@ -104,19 +111,93 @@ def api_quote():
         return jsonify({"error": str(e)}), 500
 
 
-# Placeholder for STEP 2/3. Trading stays disabled until we deliberately
-# build the order layer with guardrails.
+@app.route("/api/paper")
+def api_paper():
+    """Current paper account state, enriched with live prices."""
+    guard = require_client()
+    if guard:
+        return guard
+    try:
+        return jsonify(paper.state(client.get_prices))
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/paper/reset", methods=["POST"])
+def api_paper_reset():
+    paper.reset()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/order", methods=["POST"])
 def api_order():
-    return (
-        jsonify(
-            {
-                "error": "Trading is disabled. This build is read-only "
-                f"(TRADING_MODE={TRADING_MODE})."
-            }
-        ),
-        403,
-    )
+    """Place an order.
+
+    Routed by TRADING_MODE:
+      read_only -> 403 (no trading)
+      paper     -> simulated fill against the live market price
+      live      -> 403 for now (real orders arrive in Step 3, with guardrails)
+    """
+    if TRADING_MODE == "read_only":
+        return jsonify({"error": "Trading is disabled (TRADING_MODE=read_only)."}), 403
+    if TRADING_MODE == "live":
+        return jsonify({"error": "Live trading not yet implemented (Step 3)."}), 403
+    if TRADING_MODE != "paper":
+        return jsonify({"error": f"Unknown TRADING_MODE '{TRADING_MODE}'."}), 400
+
+    guard = require_client()
+    if guard:
+        return guard
+
+    data = request.get_json(silent=True) or {}
+    symbol = (data.get("symbol") or "").strip().upper()
+    side = (data.get("side") or "").strip().lower()
+    order_type = (data.get("type") or "market").strip().lower()
+    try:
+        quantity = float(data.get("quantity") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid quantity."}), 400
+
+    if not symbol or side not in ("buy", "sell") or quantity <= 0:
+        return jsonify({"error": "symbol, side (buy/sell), and quantity are required."}), 400
+
+    # Derive the fill price from a live quote.
+    quotes = client.get_quotes([symbol])
+    if not quotes:
+        return jsonify({"error": f"No market data for {symbol}."}), 400
+    q = quotes[0]
+    last = q["price"]
+
+    if order_type == "limit":
+        try:
+            limit_price = float(data.get("limit_price") or 0)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid limit price."}), 400
+        if limit_price <= 0:
+            return jsonify({"error": "Limit price required for limit orders."}), 400
+        # Immediate-or-reject: fill only if the limit is marketable right now.
+        marketable = last <= limit_price if side == "buy" else last >= limit_price
+        if not marketable:
+            return (
+                jsonify(
+                    {
+                        "error": f"Limit not marketable: {symbol} at ${last:,.2f}, "
+                        f"limit ${limit_price:,.2f}. (Resting orders come later.)"
+                    }
+                ),
+                422,
+            )
+        fill_price = limit_price
+    else:
+        order_type = "market"
+        fill_price = last
+
+    try:
+        trade = paper.place_order(symbol, side, quantity, order_type, fill_price)
+    except PaperError as e:
+        return jsonify({"error": str(e)}), 422
+
+    return jsonify({"ok": True, "trade": trade, "paper": paper.state(client.get_prices)})
 
 
 if __name__ == "__main__":

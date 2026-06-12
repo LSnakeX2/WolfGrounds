@@ -11,6 +11,10 @@
 *.pickle
 robinhood.pickle
 
+# Paper-trading account state (local sandbox data).
+paper_account.json
+paper_account.json.tmp
+
 # Python
 __pycache__/
 *.py[cod]

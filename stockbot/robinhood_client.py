@@ -93,6 +93,10 @@ class RobinhoodClient:
         rows.sort(key=lambda r: r["equity"], reverse=True)
         return rows
 
+    def get_prices(self, symbols):
+        """Map of {symbol: last_trade_price} for quick valuation lookups."""
+        return {q["symbol"]: q["price"] for q in self.get_quotes(symbols)}
+
     def get_quotes(self, symbols):
         """Live quote lookup for one or more ticker symbols."""
         symbols = [s.strip().upper() for s in symbols if s.strip()]

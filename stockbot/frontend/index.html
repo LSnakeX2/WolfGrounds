@@ -30,9 +30,64 @@
       <div id="quote-results"></div>
     </section>
 
+    <!-- Paper trading (active when TRADING_MODE=paper) -->
+    <section class="panel" id="paper-panel" hidden>
+      <h2>📝 Paper Trading <span class="muted">· simulated, no real money</span></h2>
+
+      <div class="cards paper-summary">
+        <div class="card sm"><div class="label">Paper Equity</div><div class="value" id="p-equity">—</div></div>
+        <div class="card sm"><div class="label">Total P&amp;L</div><div class="value" id="p-pnl">—</div></div>
+        <div class="card sm"><div class="label">Paper Cash</div><div class="value" id="p-cash">—</div></div>
+        <div class="card sm"><div class="label">Realized P&amp;L</div><div class="value" id="p-realized">—</div></div>
+      </div>
+
+      <form id="trade-form" class="trade-form">
+        <div class="seg" id="side-seg">
+          <button type="button" data-side="buy" class="active">Buy</button>
+          <button type="button" data-side="sell">Sell</button>
+        </div>
+        <input id="t-symbol" type="text" placeholder="Symbol" autocomplete="off" />
+        <input id="t-qty" type="number" step="any" min="0" placeholder="Qty" />
+        <select id="t-type">
+          <option value="market">Market</option>
+          <option value="limit">Limit</option>
+        </select>
+        <input id="t-limit" type="number" step="any" min="0" placeholder="Limit $" hidden />
+        <button type="submit" id="t-submit">Place paper order</button>
+      </form>
+      <div id="trade-msg" class="trade-msg"></div>
+
+      <h3 class="subhead">Paper positions</h3>
+      <table id="p-positions">
+        <thead><tr>
+          <th>Symbol</th><th>Qty</th><th class="num">Avg cost</th>
+          <th class="num">Price</th><th class="num">Mkt value</th><th class="num">Unreal. P&amp;L</th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="muted">No paper positions.</td></tr></tbody>
+      </table>
+
+      <h3 class="subhead">Recent paper trades
+        <button type="button" id="p-reset" class="link-btn">reset account</button>
+      </h3>
+      <table id="p-trades">
+        <thead><tr>
+          <th>Time</th><th>Side</th><th>Symbol</th>
+          <th class="num">Qty</th><th class="num">Price</th><th class="num">Notional</th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="muted">No trades yet.</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- read-only notice when not in paper mode -->
+    <section class="panel" id="paper-disabled" hidden>
+      <h2>📝 Paper Trading</h2>
+      <p class="muted">Set <code>TRADING_MODE=paper</code> in your <code>.env</code> and restart
+      to enable the simulated trade panel.</p>
+    </section>
+
     <!-- Holdings -->
     <section class="panel">
-      <h2>Holdings <span class="muted" id="refresh-note"></span></h2>
+      <h2>Real Holdings <span class="muted" id="refresh-note"></span></h2>
       <table id="holdings">
         <thead>
           <tr>
