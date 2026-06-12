@@ -1,6 +1,6 @@
-# 🐺 Wolf Grounds — Robinhood Stock Bot
+# 🐺 Wolf Grounds Alpha
 
-A local web dashboard for your Robinhood account, part of the Wolf Grounds family.
+A Robinhood trading dashboard, part of the Wolf Grounds family.
 
 **Current build: STEP 4 — full bot.** Read-only portfolio/quotes, a paper
 sandbox, **live trading** (confirmation + max-order cap + kill switch), live

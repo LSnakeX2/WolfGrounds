@@ -1,4 +1,4 @@
-// Wolf Grounds Stock Bot — dashboard frontend (read-only).
+// Wolf Grounds Alpha — dashboard frontend.
 const REFRESH_MS = 15000;
 
 const fmtUSD = (n) =>

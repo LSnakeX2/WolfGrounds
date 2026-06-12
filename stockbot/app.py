@@ -1,5 +1,5 @@
 """
-Wolf Grounds Stock Bot — Flask backend.
+Wolf Grounds Alpha — Flask backend.
 
 A local web dashboard for Robinhood: read-only portfolio/quotes, a paper-trading
 sandbox, live trading (behind confirmation + max-order cap + kill switch), live
@@ -50,7 +50,7 @@ def _enforce_auth():
         return Response(
             "Authentication required.",
             401,
-            {"WWW-Authenticate": 'Basic realm="Wolf Grounds Stock Bot"'},
+            {"WWW-Authenticate": 'Basic realm="Wolf Grounds Alpha"'},
         )
 
 
@@ -434,5 +434,5 @@ if __name__ == "__main__":
             "ERROR: HOST is not 127.0.0.1 but DASHBOARD_PASSWORD is not set.\n"
             "Set DASHBOARD_PASSWORD in .env before exposing this app publicly."
         )
-    print(f"\nWolf Grounds Stock Bot → http://{host}:{port}  (mode: {TRADING_MODE})")
+    print(f"\nWolf Grounds Alpha → http://{host}:{port}  (mode: {TRADING_MODE})")
     app.run(host=host, port=port, debug=False)

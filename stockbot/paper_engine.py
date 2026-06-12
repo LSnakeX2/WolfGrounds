@@ -1,5 +1,5 @@
 """
-Paper-trading engine for the Wolf Grounds Stock Bot (STEP 2).
+Paper-trading engine for Wolf Grounds Alpha.
 
 Simulates a brokerage account: starting cash, positions, and a trade log.
 Orders fill against LIVE market prices (fetched from Robinhood) but no real

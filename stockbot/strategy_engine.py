@@ -1,5 +1,5 @@
 """
-Automated strategy engine for the Wolf Grounds Stock Bot (Step 4).
+Automated strategy engine for Wolf Grounds Alpha.
 
 Runs scheduled strategies in a background thread:
   - "dca":       recurring buy/sell of a fixed dollar amount or share count.

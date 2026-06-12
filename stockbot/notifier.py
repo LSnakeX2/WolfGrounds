@@ -1,5 +1,5 @@
 """
-Lightweight Discord push notifications for the Wolf Grounds Stock Bot.
+Lightweight Discord push notifications for Wolf Grounds Alpha.
 
 Posts short messages to a Discord channel via an incoming webhook. Uses only
 the standard library (no discord.py needed) so the Flask server can fire alerts

@@ -1,5 +1,5 @@
 """
-Robinhood client wrapper for the Wolf Grounds Stock Bot.
+Robinhood client wrapper for Wolf Grounds Alpha.
 
 STEP 1 (this file): READ-ONLY. It logs in and reads account/portfolio/quote
 data. There are deliberately no order-placing methods here yet — live trading

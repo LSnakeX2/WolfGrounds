@@ -1,7 +1,7 @@
 """
-Wolf Grounds Stock Bot — Discord bridge.
+Wolf Grounds Alpha — Discord bridge.
 
-An interactive Discord bot (discord.py) that talks to the running Stock Bot
+An interactive Discord bot (discord.py) that talks to the running Alpha
 Flask API. Query your portfolio, quotes, paper account, live orders, and
 strategies — and place trades — from Discord. It reuses the backend's guardrails
 (max-order cap, kill switch, live confirmation), so Discord is just a front end.
@@ -75,7 +75,7 @@ async def channel_gate(ctx):
 # ── read-only commands ────────────────────────────────────────────────────────
 @bot.command(name="help")
 async def help_cmd(ctx):
-    e = discord.Embed(title="🐺 Wolf Grounds Stock Bot", color=0x7C5CFF)
+    e = discord.Embed(title="🐺 Wolf Grounds Alpha", color=0x7C5CFF)
     e.add_field(
         name="Read",
         value=f"`{PREFIX}portfolio` · `{PREFIX}quote AAPL MSFT` · `{PREFIX}paper` · "
