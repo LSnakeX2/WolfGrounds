@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Wolf Grounds — Stock Bot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🐺 Wolf Grounds <span class="muted">Stock Bot</span></h1>
+    <div id="status" class="status">connecting…</div>
+  </header>
+
+  <main>
+    <!-- Account summary -->
+    <section class="cards" id="summary">
+      <div class="card"><div class="label">Total Value</div><div class="value" id="total-equity">—</div></div>
+      <div class="card"><div class="label">Day Change</div><div class="value" id="day-change">—</div></div>
+      <div class="card"><div class="label">Buying Power (Cash)</div><div class="value" id="cash">—</div></div>
+    </section>
+
+    <!-- Quote lookup -->
+    <section class="panel">
+      <h2>Quote lookup</h2>
+      <form id="quote-form">
+        <input id="quote-input" type="text" placeholder="AAPL, MSFT, TSLA" autocomplete="off" />
+        <button type="submit">Get quotes</button>
+      </form>
+      <div id="quote-results"></div>
+    </section>
+
+    <!-- Holdings -->
+    <section class="panel">
+      <h2>Holdings <span class="muted" id="refresh-note"></span></h2>
+      <table id="holdings">
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Qty</th><th class="num">Price</th>
+            <th class="num">Avg cost</th><th class="num">Mkt value</th>
+            <th class="num">Day</th><th class="num">Total %</th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="7" class="muted">loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <p class="footnote">
+      Read-only build · no trades are placed · runs on localhost only.
+      Unofficial Robinhood access via <code>robin_stocks</code>.
+    </p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
