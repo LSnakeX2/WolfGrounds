@@ -14,13 +14,13 @@ library.
 
 ## ⚠️ Read this before running
 
-- **Localhost only.** The server binds to `127.0.0.1`. Anyone who can reach it
-  can read your brokerage account — never expose it to the internet without
-  adding real authentication.
 - **Credentials are sensitive.** Your `.env` and the `robin_stocks` session
   token can move real money. They are gitignored. Never commit them.
 - **Unofficial API.** `robin_stocks` is reverse-engineered. It can break or be
   rate-limited without notice, and may bump Robinhood's terms of service.
+- **Authentication required for public deployment.** Set `DASHBOARD_PASSWORD`
+  and `HOST=0.0.0.0` in `.env` — the server refuses to bind publicly without a
+  password. For localhost use, leave `DASHBOARD_PASSWORD` blank.
 
 ---
 
@@ -37,7 +37,7 @@ python app.py
 
 Open <http://127.0.0.1:5000>.
 
-### MFA / two-factor
+### MFA / two-factor (Robinhood login)
 
 Set `ROBINHOOD_TOTP_SECRET` in `.env` to the base32 secret from Robinhood's
 authenticator-app setup (Settings → Security → Two-Factor → Authentication app
@@ -46,17 +46,57 @@ prompted for a code in the terminal instead.
 
 ---
 
+## Deploying as a web app
+
+The server can bind publicly — set these two extra vars in `.env` (or in your
+host's environment panel):
+
+```env
+HOST=0.0.0.0          # bind to all interfaces
+DASHBOARD_USERNAME=admin
+DASHBOARD_PASSWORD=a-strong-password-here
+```
+
+The server **refuses to start** if `HOST` is not `127.0.0.1` and
+`DASHBOARD_PASSWORD` is blank.
+
+### Run with gunicorn (recommended for deployment)
+
+```bash
+pip install -r requirements.txt   # includes gunicorn
+gunicorn --workers 1 wsgi:app
+```
+
+A `Procfile` is included so platforms that support it (Render, Railway,
+Heroku) pick up the right start command automatically.
+
+### One-click cloud options
+
+| Platform | Notes |
+|----------|-------|
+| **Render** | New Web Service → connect repo → root dir `stockbot` → start command auto-detected from `Procfile` → add env vars in the dashboard |
+| **Railway** | New project → deploy from GitHub → set env vars → done |
+| **Fly.io** | `fly launch` from the `stockbot/` directory; set secrets with `fly secrets set` |
+| **VPS / Docker** | `pip install -r requirements.txt && gunicorn --bind 0.0.0.0:$PORT wsgi:app` |
+
+> **Security note:** This is still a single-user app with one shared password.
+> It's fine for personal use. Do not share the URL or credentials.
+
+---
+
 ## What's here
 
 ```
 stockbot/
 ├─ app.py               Flask backend + API
+├─ wsgi.py              gunicorn / cloud entry point
 ├─ robinhood_client.py  robin_stocks wrapper
 ├─ paper_engine.py      paper-trading sandbox
 ├─ strategy_engine.py   automated-strategy scheduler
 ├─ notifier.py          Discord webhook push alerts
 ├─ discord_bridge.py    interactive Discord bot
 ├─ requirements.txt
+├─ Procfile             start command for Render / Railway / Heroku
 ├─ .env.example         copy to .env and fill in
 └─ frontend/            dashboard (index.html / style.css / app.js)
 ```

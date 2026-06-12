@@ -12,8 +12,9 @@ internet without real auth.
 """
 
 import os
+import secrets
 import threading
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 from dotenv import load_dotenv
 
 from robinhood_client import RobinhoodClient
@@ -27,6 +28,31 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(HERE, "frontend")
 
 app = Flask(__name__, static_folder=None)
+
+# ── Dashboard auth ────────────────────────────────────────────────────────────
+# Set DASHBOARD_PASSWORD in .env to enable HTTP Basic Auth. Required whenever
+# HOST=0.0.0.0 (cloud/public deployment). Leave blank for localhost-only use.
+_DASH_USER = os.getenv("DASHBOARD_USERNAME", "admin")
+_DASH_PASS = os.getenv("DASHBOARD_PASSWORD", "")
+
+
+@app.before_request
+def _enforce_auth():
+    if not _DASH_PASS:
+        return  # no password configured → localhost-only, no challenge
+    creds = request.authorization
+    ok = (
+        creds is not None
+        and secrets.compare_digest(creds.username, _DASH_USER)
+        and secrets.compare_digest(creds.password, _DASH_PASS)
+    )
+    if not ok:
+        return Response(
+            "Authentication required.",
+            401,
+            {"WWW-Authenticate": 'Basic realm="Wolf Grounds Stock Bot"'},
+        )
+
 
 # Single shared client for this local single-user dashboard.
 client = None
@@ -402,7 +428,11 @@ if __name__ == "__main__":
     init_client()
     strategies.start()  # background scheduler for automated strategies
     port = int(os.getenv("PORT", "5000"))
-    print(f"\nWolf Grounds Stock Bot → http://127.0.0.1:{port}  (mode: {TRADING_MODE})")
-    # host=127.0.0.1 keeps this bound to localhost only. Do not change to 0.0.0.0
-    # without adding authentication — it can read your brokerage account.
-    app.run(host="127.0.0.1", port=port, debug=False)
+    host = os.getenv("HOST", "127.0.0.1")
+    if host != "127.0.0.1" and not _DASH_PASS:
+        raise SystemExit(
+            "ERROR: HOST is not 127.0.0.1 but DASHBOARD_PASSWORD is not set.\n"
+            "Set DASHBOARD_PASSWORD in .env before exposing this app publicly."
+        )
+    print(f"\nWolf Grounds Stock Bot → http://{host}:{port}  (mode: {TRADING_MODE})")
+    app.run(host=host, port=port, debug=False)
