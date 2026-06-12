@@ -50,8 +50,12 @@ prompted for a code in the terminal instead.
 
 ```
 stockbot/
-├─ app.py               Flask backend + read-only API
-├─ robinhood_client.py  robin_stocks wrapper (read-only methods)
+├─ app.py               Flask backend + API
+├─ robinhood_client.py  robin_stocks wrapper
+├─ paper_engine.py      paper-trading sandbox
+├─ strategy_engine.py   automated-strategy scheduler
+├─ notifier.py          Discord webhook push alerts
+├─ discord_bridge.py    interactive Discord bot
 ├─ requirements.txt
 ├─ .env.example         copy to .env and fill in
 └─ frontend/            dashboard (index.html / style.css / app.js)
@@ -124,9 +128,43 @@ Strategies **start disabled** — nothing trades automatically until you click
 *enable*. Saved to `strategies.json` (gitignored). Test them in paper mode (or
 with the kill switch armed) before letting them run live.
 
+## 🤖 Discord bridge
+
+Matches the other Wolf Grounds Discord bots. Two independent pieces, both
+optional:
+
+**Push alerts (no bot needed).** Set `DISCORD_WEBHOOK_URL` to a channel webhook.
+The server posts a message whenever a strategy runs or a live order is
+submitted.
+
+**Interactive bot.** Run alongside the Flask app:
+
+```bash
+python app.py            # terminal 1 — the API
+python discord_bridge.py # terminal 2 — the Discord bot
+```
+
+Commands (prefix `!` by default):
+
+| Command | Does |
+|---------|------|
+| `!portfolio` / `!paper` | account summary + holdings |
+| `!quote AAPL MSFT` | live quotes |
+| `!orders` | open live orders |
+| `!strategies` | list strategies |
+| `!status` | mode, kill switch, cap |
+| `!buy SYM QTY` / `!sell SYM QTY` | place order (live needs a ✅ reaction) |
+| `!enable ID` / `!disable ID` | toggle a strategy |
+| `!kill` / `!resume` | engage/disengage the kill switch |
+
+**Security:** set `DISCORD_CHANNEL_ID` (restricts commands to one channel) and
+`DISCORD_ALLOWED_USER_IDS` (only these users can trade/control). The bridge just
+calls the API, so the same cap, kill switch, and live-confirmation all apply.
+
 ## Roadmap
 
 1. **Read-only dashboard** ✅
 2. **Paper trading** — simulated fills against live prices ✅
 3. **Live trading** — real orders, confirmation + max-order cap + kill switch ✅
-4. **Orders/cancel + automated strategies** (DCA, rebalance) ✅ ← you are here
+4. **Orders/cancel + automated strategies** (DCA, rebalance) ✅
+5. **Discord bridge** — alerts + interactive bot ✅ ← you are here

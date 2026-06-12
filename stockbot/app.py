@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from robinhood_client import RobinhoodClient
 from paper_engine import PaperBroker, PaperError
 from strategy_engine import StrategyEngine
+from notifier import make_notifier
 
 load_dotenv()
 
@@ -105,6 +106,9 @@ def can_trade():
     return TRADING_MODE in ("paper", "live") and not trading_killed and client is not None
 
 
+# Optional Discord push notifications (webhook). No-op if unset.
+notify = make_notifier(os.getenv("DISCORD_WEBHOOK_URL"))
+
 # Automated-strategy scheduler (Step 4). Thread starts in __main__.
 strategies = StrategyEngine(
     state_path=os.path.join(HERE, "strategies.json"),
@@ -112,6 +116,7 @@ strategies = StrategyEngine(
     get_prices=lambda syms: client.get_prices(syms),
     get_portfolio=portfolio_snapshot,
     can_trade=can_trade,
+    on_event=lambda text: notify(text),
 )
 
 
@@ -318,6 +323,7 @@ def api_order():
     except Exception as e:  # noqa: BLE001
         return jsonify({"error": f"Order rejected: {e}"}), 422
 
+    notify(f"✅ LIVE {side.upper()} {quantity} {symbol} submitted (~${est_notional:,.2f}).")
     return jsonify({"ok": True, "live": True, "order": result["order"], "preview": preview})
 
 

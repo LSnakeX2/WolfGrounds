@@ -38,6 +38,7 @@ class StrategyEngine:
         get_prices,         # (list[str]) -> {symbol: price}
         get_portfolio,      # () -> (total_equity, {symbol: market_value})
         can_trade,          # () -> bool  (mode is paper/live AND not killed)
+        on_event=None,      # (str) -> None  optional; called with a run summary
         check_interval=30,
     ):
         self._path = state_path
@@ -45,6 +46,7 @@ class StrategyEngine:
         self._get_prices = get_prices
         self._get_portfolio = get_portfolio
         self._can_trade = can_trade
+        self._on_event = on_event or (lambda text: None)
         self._check_interval = check_interval
         self._lock = threading.Lock()
         self._strategies = self._load()
@@ -203,6 +205,9 @@ class StrategyEngine:
                     st["last_result"] = result
                     self._save()
                     break
+
+        icon = "✅" if result["ok"] else "⚠️"
+        self._on_event(f"{icon} [strategy {s['type']}] {result['detail']}")
 
     def _price(self, symbol):
         p = self._get_prices([symbol]).get(symbol, 0)
