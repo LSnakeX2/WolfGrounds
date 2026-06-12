@@ -323,6 +323,192 @@ function setupKillSwitch(status) {
   });
 }
 
+// ── live orders ─────────────────────────────────────────────────────────────
+async function loadOrders() {
+  const tbody = document.querySelector("#orders-table tbody");
+  let orders;
+  try {
+    ({ orders } = await getJSON("/api/orders"));
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" class="neg">${e.message}</td></tr>`;
+    return;
+  }
+  if (!orders.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="muted">No recent orders.</td></tr>`;
+    return;
+  }
+  const cancellable = ["queued", "confirmed", "unconfirmed", "partially_filled"];
+  tbody.innerHTML = orders
+    .map((o) => {
+      const canCancel = cancellable.includes((o.state || "").toLowerCase());
+      return `<tr>
+        <td class="muted">${o.created_at ? new Date(o.created_at).toLocaleString() : "—"}</td>
+        <td><strong>${o.symbol}</strong></td>
+        <td class="${o.side === "buy" ? "pos" : "neg"}">${(o.side || "").toUpperCase()}</td>
+        <td>${o.type || ""}</td>
+        <td class="num">${o.quantity}</td>
+        <td class="num">${o.filled}</td>
+        <td>${o.state || ""}</td>
+        <td class="num">${canCancel ? `<button class="cancel-btn" data-cancel="${o.id}">cancel</button>` : ""}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function setupOrders() {
+  document.getElementById("orders-refresh").addEventListener("click", loadOrders);
+  document.querySelector("#orders-table tbody").addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-cancel]");
+    if (!btn) return;
+    if (!confirm("Cancel this live order?")) return;
+    btn.disabled = true;
+    try {
+      const r = await fetch("/api/orders/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: btn.dataset.cancel }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || r.statusText);
+    } catch (err) {
+      alert("Cancel failed: " + err.message);
+    }
+    loadOrders();
+  });
+}
+
+// ── strategies ──────────────────────────────────────────────────────────────
+const INTERVALS = { 3600: "hourly", 86400: "daily", 604800: "weekly" };
+const intervalLabel = (n) => INTERVALS[n] || `${n}s`;
+
+function strategyDetails(s) {
+  if (s.type === "dca") {
+    const amt = s.amount_usd > 0 ? fmtUSD(s.amount_usd) : `${s.shares} sh`;
+    return `${(s.side || "buy").toUpperCase()} ${amt} of <strong>${s.symbol}</strong>`;
+  }
+  if (s.type === "rebalance") {
+    const t = Object.entries(s.targets || {})
+      .map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`)
+      .join(" · ");
+    return `${t} <span class="muted">(min ${fmtUSD(s.threshold_usd)})</span>`;
+  }
+  return s.type;
+}
+
+async function loadStrategies() {
+  const tbody = document.querySelector("#strat-table tbody");
+  let list;
+  try {
+    ({ strategies: list } = await getJSON("/api/strategies"));
+  } catch (e) {
+    return;
+  }
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">No strategies yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list
+    .map((s) => {
+      const res = s.last_result;
+      const status = res
+        ? `<span class="${res.ok ? "pos" : "neg"}">${res.ok ? "✓" : "✗"} ${res.detail || ""}</span>`
+        : '<span class="muted">not run yet</span>';
+      const badge = s.enabled ? '<span class="badge on">ON</span>' : '<span class="badge off">off</span>';
+      return `<tr>
+        <td>${s.type} ${badge}</td>
+        <td>${strategyDetails(s)}</td>
+        <td>${intervalLabel(s.interval_seconds)}</td>
+        <td class="muted">${s.last_run ? new Date(s.last_run).toLocaleString() : "—"}</td>
+        <td>${status}</td>
+        <td class="row-actions">
+          <button class="toggle-btn" data-toggle="${s.id}" data-enabled="${s.enabled}">${s.enabled ? "disable" : "enable"}</button>
+          <button class="toggle-btn" data-run="${s.id}">run now</button>
+          <button class="del-btn" data-del="${s.id}">×</button>
+        </td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function setupStrategies(mode) {
+  document.getElementById("strat-mode").textContent = `· runs in ${mode} mode`;
+
+  // Show fields for the selected strategy type
+  const typeSel = document.getElementById("s-type");
+  const syncFields = () => {
+    document.querySelectorAll(".s-fields").forEach((el) => {
+      el.hidden = el.dataset.for !== typeSel.value;
+    });
+  };
+  typeSel.addEventListener("change", syncFields);
+  syncFields();
+
+  // Add strategy
+  document.getElementById("strat-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("strat-msg");
+    const type = typeSel.value;
+    const interval_seconds = parseInt(document.getElementById("s-interval").value, 10);
+    let body = { type, interval_seconds };
+
+    if (type === "dca") {
+      body.side = document.getElementById("s-side").value;
+      body.symbol = document.getElementById("s-symbol").value.trim().toUpperCase();
+      body.amount_usd = parseFloat(document.getElementById("s-amount").value) || 0;
+      body.shares = parseFloat(document.getElementById("s-shares").value) || 0;
+    } else {
+      const targets = {};
+      document.getElementById("s-targets").value.split(",").forEach((pair) => {
+        const [sym, w] = pair.split(":").map((x) => (x || "").trim());
+        if (sym && w) targets[sym.toUpperCase()] = parseFloat(w);
+      });
+      body.targets = targets;
+      body.threshold_usd = parseFloat(document.getElementById("s-threshold").value) || 25;
+    }
+
+    try {
+      const r = await fetch("/api/strategies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || r.statusText);
+      msg.textContent = "✓ Strategy added (disabled). Enable it to start trading.";
+      msg.className = "trade-msg ok";
+      e.target.reset();
+      syncFields();
+      loadStrategies();
+    } catch (err) {
+      msg.textContent = "✗ " + err.message;
+      msg.className = "trade-msg err";
+    }
+  });
+
+  // Row actions (toggle / run / delete)
+  document.querySelector("#strat-table tbody").addEventListener("click", async (e) => {
+    const t = e.target;
+    if (t.dataset.toggle) {
+      const enable = t.dataset.enabled !== "true";
+      if (enable && !confirm("Enable this strategy? It will place real-mode orders automatically.")) return;
+      await fetch(`/api/strategies/${t.dataset.toggle}/toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: enable }),
+      });
+      loadStrategies();
+    } else if (t.dataset.run) {
+      t.disabled = true;
+      await fetch(`/api/strategies/${t.dataset.run}/run`, { method: "POST" });
+      loadStrategies();
+    } else if (t.dataset.del) {
+      if (!confirm("Delete this strategy?")) return;
+      await fetch(`/api/strategies/${t.dataset.del}`, { method: "DELETE" });
+      loadStrategies();
+    }
+  });
+}
+
 (async function main() {
   const s = await loadStatus();
   if (!s || !s.logged_in) return;
@@ -336,6 +522,8 @@ function setupKillSwitch(status) {
   document.getElementById("paper-portfolio").hidden = !isPaper;
   document.getElementById("live-banner").hidden = !isLive;
   document.getElementById("trading-disabled").hidden = tradingOn;
+  document.getElementById("orders-panel").hidden = !isLive;
+  document.getElementById("strategies-panel").hidden = !tradingOn;
   document.getElementById("trade-title").textContent = isLive
     ? "⚠️ Live Trade — real money"
     : "📝 Paper Trade — simulated";
@@ -343,13 +531,23 @@ function setupKillSwitch(status) {
   loadPortfolio();
   if (tradingOn) setupTradePanel();
   if (isPaper) loadPaper();
-  if (isLive) setupKillSwitch(s);
+  if (isLive) {
+    setupKillSwitch(s);
+    setupOrders();
+    loadOrders();
+  }
+  if (tradingOn) {
+    setupStrategies(tradingMode);
+    loadStrategies();
+  }
 
   setInterval(async () => {
     const st = await loadStatus();
     if (st && st.logged_in) {
       loadPortfolio();
       if (isPaper) loadPaper();
+      if (isLive) loadOrders();
+      if (tradingOn) loadStrategies();
     }
   }, REFRESH_MS);
 })();

@@ -15,6 +15,10 @@ robinhood.pickle
 paper_account.json
 paper_account.json.tmp
 
+# Saved automated strategies (local user config).
+strategies.json
+strategies.json.tmp
+
 # Python
 __pycache__/
 *.py[cod]

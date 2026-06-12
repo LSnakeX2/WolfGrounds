@@ -111,6 +111,62 @@
       </div>
     </div>
 
+    <!-- Open orders + history (live mode) -->
+    <section class="panel" id="orders-panel" hidden>
+      <h2>Live Orders <button type="button" id="orders-refresh" class="link-btn">refresh</button></h2>
+      <table id="orders-table">
+        <thead><tr>
+          <th>Created</th><th>Symbol</th><th>Side</th><th>Type</th>
+          <th class="num">Qty</th><th class="num">Filled</th><th>State</th><th></th>
+        </tr></thead>
+        <tbody><tr><td colspan="8" class="muted">loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- Automated strategies (paper or live) -->
+    <section class="panel" id="strategies-panel" hidden>
+      <h2>🤖 Automated Strategies <span class="muted" id="strat-mode"></span></h2>
+      <p class="muted strat-note">New strategies start <strong>disabled</strong>. While enabled they
+      trade on their own — every order still obeys the max-order cap and kill switch.</p>
+
+      <form id="strat-form" class="strat-form">
+        <select id="s-type">
+          <option value="dca">DCA / recurring</option>
+          <option value="rebalance">Rebalance</option>
+        </select>
+
+        <!-- DCA fields -->
+        <span class="s-fields" data-for="dca">
+          <select id="s-side"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+          <input id="s-symbol" type="text" placeholder="Symbol" />
+          <input id="s-amount" type="number" step="any" min="0" placeholder="$ amount" />
+          <span class="muted">or</span>
+          <input id="s-shares" type="number" step="any" min="0" placeholder="shares" />
+        </span>
+
+        <!-- Rebalance fields -->
+        <span class="s-fields" data-for="rebalance" hidden>
+          <input id="s-targets" type="text" placeholder="AAPL:0.5, MSFT:0.5" class="wide" />
+          <input id="s-threshold" type="number" step="any" min="0" placeholder="min $ trade" />
+        </span>
+
+        <select id="s-interval">
+          <option value="3600">hourly</option>
+          <option value="86400" selected>daily</option>
+          <option value="604800">weekly</option>
+        </select>
+        <button type="submit">Add strategy</button>
+      </form>
+      <div id="strat-msg" class="trade-msg"></div>
+
+      <table id="strat-table">
+        <thead><tr>
+          <th>Type</th><th>Details</th><th>Every</th><th>Last run</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="muted">No strategies yet.</td></tr></tbody>
+      </table>
+    </section>
+
     <!-- Holdings -->
     <section class="panel">
       <h2>Real Holdings <span class="muted" id="refresh-note"></span></h2>

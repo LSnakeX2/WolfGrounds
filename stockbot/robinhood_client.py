@@ -130,6 +130,49 @@ class RobinhoodClient:
             "type": result.get("type", order_type),
         }
 
+    def _symbol_for(self, instrument_url):
+        """Resolve (and cache) a ticker symbol from an instrument URL."""
+        cache = getattr(self, "_symbol_cache", None)
+        if cache is None:
+            cache = self._symbol_cache = {}
+        if instrument_url not in cache:
+            try:
+                cache[instrument_url] = rh.stocks.get_symbol_by_url(instrument_url)
+            except Exception:  # noqa: BLE001
+                cache[instrument_url] = "?"
+        return cache[instrument_url]
+
+    def get_orders(self, open_only=False, limit=25):
+        """Recent stock orders (or only currently open ones)."""
+        raw = (
+            rh.orders.get_all_open_stock_orders()
+            if open_only
+            else rh.orders.get_all_stock_orders()
+        )
+        rows = []
+        for o in raw[:limit]:
+            rows.append(
+                {
+                    "id": o.get("id"),
+                    "symbol": self._symbol_for(o.get("instrument")),
+                    "side": o.get("side"),
+                    "type": o.get("type"),
+                    "state": o.get("state"),
+                    "quantity": float(o.get("quantity") or 0),
+                    "filled": float(o.get("cumulative_quantity") or 0),
+                    "price": float(o.get("price")) if o.get("price") else None,
+                    "average_price": float(o.get("average_price"))
+                    if o.get("average_price")
+                    else None,
+                    "created_at": o.get("created_at"),
+                }
+            )
+        return rows
+
+    def cancel_order(self, order_id):
+        """Cancel an open stock order by id."""
+        return rh.orders.cancel_stock_order(order_id)
+
     def get_quotes(self, symbols):
         """Live quote lookup for one or more ticker symbols."""
         symbols = [s.strip().upper() for s in symbols if s.strip()]

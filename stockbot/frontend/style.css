@@ -114,6 +114,22 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .modal-actions button { padding: 10px 18px; }
 button.ghost { background: var(--panel-2); color: var(--text); }
 
+/* strategies + orders */
+.strat-note { font-size: 13px; margin: -4px 0 14px; }
+.strat-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
+.strat-form input, .strat-form select { background: var(--panel-2); border: 1px solid #313742; color: var(--text); border-radius: 8px; padding: 9px 11px; font-size: 14px; }
+.strat-form #s-symbol { width: 100px; text-transform: uppercase; }
+.strat-form #s-amount, .strat-form #s-shares, .strat-form #s-threshold { width: 100px; }
+.strat-form .wide { width: 220px; }
+.s-fields { display: inline-flex; gap: 8px; align-items: center; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+.badge.on { background: var(--green); color: #06210f; }
+.badge.off { background: var(--panel-2); color: var(--muted); }
+.row-actions button { padding: 5px 10px; font-size: 12px; margin-left: 6px; }
+.toggle-btn { background: var(--panel-2); color: var(--text); }
+.del-btn { background: transparent; color: var(--red); border: 1px solid var(--red); }
+.cancel-btn { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 4px 10px; font-size: 12px; }
+
 .footnote { color: var(--muted); font-size: 12px; margin-top: 28px; }
 code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; }
 

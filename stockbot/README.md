@@ -2,10 +2,10 @@
 
 A local web dashboard for your Robinhood account, part of the Wolf Grounds family.
 
-**Current build: STEP 3 — full bot (read-only + paper + live trading).** It
-shows your real portfolio, live quotes, and day P&L; a simulated paper-trading
-panel; and **live trading with real money**, gated behind a confirmation step,
-a hard max-order cap, and a kill switch.
+**Current build: STEP 4 — full bot.** Read-only portfolio/quotes, a paper
+sandbox, **live trading** (confirmation + max-order cap + kill switch), live
+**open-orders/history with cancel**, and a background scheduler for
+**automated strategies** (DCA / rebalance).
 
 Powered by the unofficial [`robin_stocks`](https://github.com/jmfernandes/robin_stocks)
 library.
@@ -68,6 +68,13 @@ stockbot/
 | `POST /api/paper/reset` | reset the paper account            |
 | `POST /api/order`    | place an order (see modes below)      |
 | `POST /api/kill`     | engage/disengage the live kill switch |
+| `GET /api/orders[?open=1]` | live orders (history or open only) |
+| `POST /api/orders/cancel`  | cancel a live order (live mode)   |
+| `GET /api/strategies` | list automated strategies            |
+| `POST /api/strategies` | add a strategy (starts disabled)    |
+| `POST /api/strategies/<id>/toggle` | enable/disable          |
+| `POST /api/strategies/<id>/run`    | run once now            |
+| `DELETE /api/strategies/<id>`      | delete                  |
 
 ### Paper trading
 
@@ -97,8 +104,29 @@ Set `TRADING_MODE=live`. **Every order places a real trade.** Guardrails:
 **Strongly recommended:** paper-trade first, then go live with a low
 `MAX_ORDER_USD` and the kill switch armed until you trust it.
 
+### Live orders & cancel
+
+In live mode the dashboard shows a **Live Orders** panel (recent + open) with a
+**cancel** button on any still-open order.
+
+### 🤖 Automated strategies
+
+A background scheduler runs saved strategies on a timer. It works in **paper**
+or **live** mode, and every order it generates goes through the **same kill
+switch and max-order cap** as manual trades.
+
+- **DCA / recurring** — buy or sell a fixed dollar amount (or share count) of a
+  symbol on an interval (hourly / daily / weekly).
+- **Rebalance** — given target weights (e.g. `AAPL:0.5, MSFT:0.5`), trade toward
+  them when a position drifts past a minimum-dollar threshold.
+
+Strategies **start disabled** — nothing trades automatically until you click
+*enable*. Saved to `strategies.json` (gitignored). Test them in paper mode (or
+with the kill switch armed) before letting them run live.
+
 ## Roadmap
 
 1. **Read-only dashboard** ✅
 2. **Paper trading** — simulated fills against live prices ✅
-3. **Live trading** — real orders, confirmation + max-order cap + kill switch ✅ ← you are here
+3. **Live trading** — real orders, confirmation + max-order cap + kill switch ✅
+4. **Orders/cancel + automated strategies** (DCA, rebalance) ✅ ← you are here
